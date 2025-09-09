@@ -1,0 +1,21 @@
+[build]
+  # Direktori yang akan diterbitkan
+  publish = "public"
+
+[functions]
+  # Direktori tempat fungsi-fungsi Netlify Anda berada
+  directory = "netlify/functions"
+```
+eof
+
+Setelah Anda menambahkan file `netlify.toml` ini ke direktori utama proyek Anda, lakukan langkah-langkah berikut:
+
+1.  **Commit Perubahan:**
+    ```bash
+    git add .
+    git commit -m "Add Netlify configuration file"
+    ```
+2.  **Push ke GitHub:**
+    ```bash
+    git push
+    
