@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dokumen Ringkas</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center py-10">
+    <div class="container mx-auto p-8 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Ringkasan Dokumen Otomatis</h1>
+        <p class="text-center text-gray-600 mb-8">Unggah dokumen (.docx atau .pdf) untuk mendapatkan ringkasan instan.</p>
+
+        <form id="uploadForm" class="flex flex-col items-center space-y-4 mb-8">
+            <div class="w-full flex justify-center">
+                <label class="cursor-pointer bg-blue-500 text-white font-medium py-3 px-6 rounded-full shadow-md hover:bg-blue-600 transition-colors duration-200">
+                    Pilih File
+                    <input type="file" id="documentFile" name="documentFile" accept=".pdf,.docx" class="hidden">
+                </label>
+            </div>
+            <span id="fileName" class="text-gray-500 text-sm">Belum ada file yang dipilih.</span>
+            
+            <select id="languageSelect" class="w-full sm:w-1/2 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+                <option value="Indonesian">Bahasa Indonesia</option>
+                <option value="English">English</option>
+            </select>
+
+            <button type="submit" class="w-full sm:w-1/2 bg-green-500 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-green-600 transition-colors duration-200">
+                Buat Ringkasan
+            </button>
+        </form>
+
+        <div id="loadingIndicator" class="hidden flex justify-center items-center space-x-2 text-gray-500 mb-4">
+            <svg class="animate-spin h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Membuat ringkasan...</span>
+        </div>
+        
+        <div id="summaryContainer" class="hidden mt-8 border-t pt-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4 sm:mb-0">Hasil Ringkasan</h2>
+                <button id="downloadButton" class="bg-purple-500 text-white font-medium py-2 px-4 rounded-full shadow-md hover:bg-purple-600 transition-colors duration-200">
+                    Unduh PDF
+                </button>
+            </div>
+            <div id="summaryContent" class="prose max-w-none text-gray-800"></div>
+        </div>
+    </div>
+    
+    <!-- Formulir tersembunyi untuk mengunduh PDF -->
+    <form id="downloadForm" method="POST" action="/download-pdf" style="display: none;">
+        <input type="hidden" name="summary" id="downloadSummaryInput">
+    </form>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const documentFile = document.getElementById('documentFile');
+        const fileNameSpan = document.getElementById('fileName');
+        const summaryContainer = document.getElementById('summaryContainer');
+        const summaryContent = document.getElementById('summaryContent');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const downloadButton = document.getElementById('downloadButton');
+        const languageSelect = document.getElementById('languageSelect');
+        let currentSummary = '';
+
+        documentFile.addEventListener('change', () => {
+            if (documentFile.files.length > 0) {
+                fileNameSpan.textContent = documentFile.files[0].name;
+            } else {
+                fileNameSpan.textContent = 'Belum ada file yang dipilih.';
+            }
+        });
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = documentFile.files[0];
+            if (!file) {
+                alert('Pilih file terlebih dahulu!');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            summaryContainer.classList.add('hidden');
+            summaryContent.innerHTML = '';
+            
+            const formData = new FormData();
+            formData.append('documentFile', file);
+            formData.append('language', languageSelect.value);
+
+            try {
+                const response = await fetch('/upload-and-summarize', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message);
+                }
+
+                const data = await response.json();
+                currentSummary = data.summary;
+                summaryContent.innerHTML = marked.parse(currentSummary);
+                summaryContainer.classList.remove('hidden');
+
+            } catch (error) {
+                summaryContent.innerHTML = `<div class="text-red-500">Error: ${error.message}</div>`;
+                summaryContainer.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        downloadButton.addEventListener('click', () => {
+            if (!currentSummary) {
+                alert('Tidak ada ringkasan untuk diunduh.');
+                return;
+            }
+
+            // Menggunakan form tersembunyi untuk mengunduh, menghindari masalah fetch API
+            const downloadForm = document.getElementById('downloadForm');
+            const downloadSummaryInput = document.getElementById('downloadSummaryInput');
+            
+            downloadSummaryInput.value = currentSummary;
+            downloadForm.submit();
+        });
+
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</body>
+</html>
